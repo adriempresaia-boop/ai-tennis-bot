@@ -1,0 +1,13 @@
+[
+  { "matchup": "Roberto Bautista Agut vs Pablo Carreno Busta", "player": "Roberto Bautista Agut", "min_streak": 2 },
+  { "matchup": "Aslan Karatsev vs Jenson Brooksby", "player": "Aslan Karatsev", "min_streak": 3 },
+  { "matchup": "Kei Nishikori vs Gilles Simon", "player": "Kei Nishikori", "min_streak": 3 },
+  { "matchup": "Jack Sock vs Richard Gasquet", "player": "Richard Gasquet", "min_streak": 2 },
+  { "matchup": "Denis Shapovalov vs Dominic Thiem", "player": "ANY", "min_streak": 4 },
+  { "matchup": "Hubert Hurkacz vs Stan Wawrinka", "player": "Hubert Hurkacz", "min_streak": 2 },
+  { "matchup": "Nick Kyrgios vs Diego Schwartzman", "player": "Nick Kyrgios", "min_streak": 2 },
+  { "matchup": "Frances Tiafoe vs Lorenzo Musetti", "player": "Lorenzo Musetti", "min_streak": 2 },
+  { "matchup": "Marin Cilic vs Alex de Minaur", "player": "ANY", "min_streak": 4 },
+  { "matchup": "Milos Raonic vs Feliciano Lopez", "player": "ANY", "min_streak": 4 },
+  { "matchup": "Thanasi Kokkinakis vs Felix Auger-Aliassime", "player": "Thanasi Kokkinakis", "min_streak": 2 }
+]
