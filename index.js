@@ -1,7 +1,6 @@
-// index.js — TwentyBet Full Ace Bot con diagnósticos
+// index.js — Bot Full Ace leyendo resultados finales por marcador (2-0, 3-1, etc.)
 require('dotenv').config();
 const fs = require('fs');
-const path = require('path');
 const { chromium } = require('playwright');
 const { GoogleAuth } = require('google-auth-library');
 const { sheets_v4 } = require('@googleapis/sheets');
@@ -27,6 +26,7 @@ const RULES    = loadJSON('./rules.json',   []);
 const STATE    = loadJSON('./state.json',   { streaks: {}, lastAlertAt: null });
 const CACHE    = loadJSON('./cache.json',   { seen: {} });
 
+// normalización de nombres y alias frecuentes
 const ALIASES = {
   "Bautista Agut, Roberto": "Roberto Bautista Agut",
   "Carreño Busta, Pablo": "Pablo Carreño Busta",
@@ -76,22 +76,13 @@ function mid(a, b) {
 function getCredsFromEnv(){
   if (GCP_SA_JSON) {
     const obj = JSON.parse(GCP_SA_JSON);
-    return {
-      client_email: obj.client_email,
-      private_key: (obj.private_key || '').replace(/\\n/g,'\n')
-    };
+    return { client_email: obj.client_email, private_key: (obj.private_key || '').replace(/\\n/g,'\n') };
   }
-  return {
-    client_email: GS_CLIENT_EMAIL,
-    private_key: (GS_PRIVATE_KEY || '').replace(/\\n/g,'\n')
-  };
+  return { client_email: GS_CLIENT_EMAIL, private_key: (GS_PRIVATE_KEY || '').replace(/\\n/g,'\n') };
 }
 
 async function getSheets(){
-  const auth = new GoogleAuth({
-    credentials: getCredsFromEnv(),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets']
-  });
+  const auth = new GoogleAuth({ credentials: getCredsFromEnv(), scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
   return new sheets_v4.Sheets({ auth });
 }
 
@@ -128,6 +119,7 @@ async function alert({mid,owner,len,min}){
   await fetch(ALERT_WEBHOOK_URL,{method:'POST',headers,body:JSON.stringify({text:txt})});
   STATE.lastAlertAt=new Date().toISOString(); saveJSON('./state.json',STATE);
 }
+
 function computeTables(rows){
   const by={};
   for(const r of rows){ const [ts,id,a,b,w]=r; if(!id||!w) continue;
@@ -154,12 +146,14 @@ async function ensureHeaders(s){
   const a=await read(s,'Alerts!A:F'); if(!a.length) await clearUpdate(s,'Alerts!A:F',[['timestamp','matchup_id','winner','streak_len','rule_min_streak','note']]);
 }
 
-// --- helpers UI ---
+// --- navegación/scroll ---
 async function clickIfVisible(page, text){
   const btn = page.getByRole('button', { name: new RegExp(text, 'i') });
   if(await btn.count()){ await btn.first().click().catch(()=>{}); return true; }
-  const tab = page.locator(`a:has-text("${text}")`);
+  const tab = page.locator(`:is(a,button,div,span)[role="tab"]:has-text("${text}")`);
   if(await tab.count()){ await tab.first().click().catch(()=>{}); return true; }
+  const any = page.locator(`:text("${text}")`);
+  if(await any.count()){ await any.first().click().catch(()=>{}); return true; }
   return false;
 }
 async function autoScroll(page, ms=3000){
@@ -169,10 +163,49 @@ async function autoScroll(page, ms=3000){
     await page.waitForTimeout(250);
   }
 }
+async function dumpPage(page){
+  const url = page.url();
+  const title = await page.title().catch(()=> '');
+  const text = await page.evaluate(() => document.body.innerText.slice(0, 2000)).catch(()=> '');
+  console.log('[DBG] PAGE URL:', url);
+  console.log('[DBG] PAGE TITLE:', title);
+  console.log('[DBG] PAGE TEXT SAMPLE:', text);
+}
 
-// --- lógica de scraping ---
+// --- extracción helpers ---
+const SCORE_RE = /\b(2-0|0-2|3-1|1-3|3-2|2-3)\b/; // final a 2 ó 3 sets
+
+function pickPlayersFromText(text){
+  // intenta mapear nombres de MATCHUPS presentes en la tarjeta
+  const present = [];
+  for (const m of MATCHUPS) {
+    const A = norm(m.a), B = norm(m.b);
+    const rxA = new RegExp(`\\b${A}\\b`, 'i');
+    const rxB = new RegExp(`\\b${B}\\b`, 'i');
+    if (rxA.test(text) && rxB.test(text)) {
+      // intenta respetar el ORDEN de aparición en el texto (A arriba, B abajo)
+      const idxA = text.search(rxA);
+      const idxB = text.search(rxB);
+      if (idxA <= idxB) present.push({ a: A, b: B });
+      else              present.push({ a: B, b: A });
+    }
+  }
+  // devuelve el primero encontrado
+  return present[0] || null;
+}
+
+function winnerFromScore(pair, score){
+  // por convención: primer número del marcador corresponde al primer nombre (pair.a)
+  const [n1, n2] = score.split('-').map(x => parseInt(x,10));
+  if (Number.isNaN(n1) || Number.isNaN(n2)) return null;
+  if (n1 === n2) return null;
+  return (n1 > n2) ? pair.a : pair.b;
+}
+
+// --- scraping principal ---
 async function scrapeOnce(page, s) {
   await page.goto(BETTING_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(()=>{});
 
   // cookies
   for (const label of ['Aceptar','Acepto','OK','De acuerdo','I agree','Accept']) {
@@ -180,98 +213,89 @@ async function scrapeOnce(page, s) {
     if (await btn.count()) { await btn.first().click().catch(() => {}); break; }
   }
 
-  // Ir a la pestaña "AI Tennis" si aparece
+  // pestaña de tenis (varía por skin)
   await clickIfVisible(page, 'AI Tennis').catch(()=>{});
-  await page.waitForTimeout(500);
-  await autoScroll(page, parseInt(SCROLL_MS || '3000',10));
+  await clickIfVisible(page, 'vTennis').catch(()=>{});
+  await clickIfVisible(page, 'Tennis').catch(()=>{});
+  await page.waitForTimeout(600);
+  await autoScroll(page, parseInt(SCROLL_MS || '4000',10));
 
-  // Tarjetas que contengan texto "Winner" (mercado ganador)
-  const allCards = await page.locator('div:has-text("Winner")').all();
+  // recolecta contenedores amplios: cards, sections, articles
+  const blocks = await page.locator('section, article, div').all();
   let cards = [];
-  for (const c of allCards) {
-    const txt = (await c.textContent() || '').replace(/\s+/g,' ').trim();
-    if (txt.length > 0) cards.push({ node: c, text: txt });
+  for (const node of blocks.slice(0, 600)) { // límite por rendimiento
+    const txt = (await node.textContent().catch(()=> '') || '').replace(/\s+/g,' ').trim();
+    if (!txt) continue;
+
+    // ¿contiene marcador final?
+    const m = txt.match(SCORE_RE);
+    if (!m) continue;
+
+    // ¿contiene un enfrentamiento conocido?
+    const pair = pickPlayersFromText(txt);
+    if (!pair) continue;
+
+    cards.push({ node, text: txt, score: m[1], pair });
   }
-  log('Cards totales:', cards.length);
+
+  if (cards.length === 0) {
+    log('No se detectaron tarjetas con marcador final y nombres conocidos.');
+    if (String(DIAG_ECHO||'').trim()==='1') await dumpPage(page);
+  }
 
   const now = new Date().toISOString();
-  let matched=0, finalLike=0, appended=0, diagDumped=0;
+  let appended = 0;
 
-  for (const {node: card, text} of cards) {
-    // match con tus enfrentamientos
-    let pair = null;
-    for (const m of MATCHUPS) {
-      const A = norm(m.a), B = norm(m.b);
-      if (new RegExp(`\\b${A}\\b`, 'i').test(text) && new RegExp(`\\b${B}\\b`, 'i').test(text)) {
-        pair = { a: A, b: B }; break;
-      }
-    }
-    if (!pair) continue;
-    matched++;
-
-    const id = mid(pair.a, pair.b);
-
-    // Heurística de "parece finalizado": no LIVE y alguna odds/row deshabilitada o etiqueta de resultado
-    const hasLive      = await card.locator(':text("LIVE")').count();
-    const hasFt        = await card.locator(':text("FT"), :text("Finished"), :text("Final")').count();
-    const disabledOdds = await card.locator('button[disabled], [aria-disabled="true"]').count();
-    const winnerMark   = await card.locator('.is-winner, .winner, [data-result="win"], .result-win').count();
-    const looksFinal   = (!hasLive && (hasFt || disabledOdds || winnerMark));
-    if (!looksFinal) continue;
-    finalLike++;
-
-    // Detección de ganador
-    let winner = '';
-    // 1) clases típicas
-    winner = await card.locator('.is-winner, .winner, [data-result="win"], .result-win').first().textContent().catch(()=> '');
-    winner = norm(winner);
-
-    // 2) heurísticas adicionales: fila marcada con icono trofeo o clase 'win'
+  for (const c of cards) {
+    const id = mid(c.pair.a, c.pair.b);
+    const winner = winnerFromScore(c.pair, c.score);
     if (!winner) {
-      for (const sel of ['.player:has(.icon-trophy)', '.participant:has(.icon-trophy)', '.market-row.win', '.row.win', '.outcome.win']) {
-        const t = await card.locator(sel).first().textContent().catch(()=> '');
-        if (t) { winner = norm(t); break; }
-      }
-    }
-
-    if (!winner) {
-      // Dump de diagnóstico controlado por env var
-      if (String(DIAG_ECHO||'').trim()==='1' && diagDumped < 2) {
-        const html = await card.evaluate(el => el.outerHTML);
-        console.log('--- DIAG CARD START ---');
-        console.log(html.slice(0, 4000)); // recorte por logs
-        console.log('--- DIAG CARD END ---');
-        diagDumped++;
+      if (String(DIAG_ECHO||'').trim()==='1') {
+        console.log('--- DIAG CARD (sin ganador deducible) ---');
+        console.log(c.text.slice(0, 1500));
+        console.log('-----------------------------------------');
       }
       continue;
     }
+    const loser = (winner === c.pair.a) ? c.pair.b : c.pair.a;
 
-    const loser = winner === pair.a ? pair.b : pair.a;
-    const key   = `${id}|${winner}|${now.slice(0,10)}`;
+    // evita duplicados del mismo día
+    const key = `${id}|${winner}|${c.score}|${now.slice(0,10)}`;
     if (CACHE.seen[key]) continue;
 
-    const st = updateStreak(STATE.streaks[id], winner, now);
-    STATE.streaks[id] = st; saveJSON('./state.json', STATE);
-
-    await append(s, 'Results!A:I', [now, id, pair.a, pair.b, winner, loser, '', BETTING_URL, key]);
+    // escribe en Results
+    await append(s, 'Results!A:I', [
+      now, id, c.pair.a, c.pair.b, winner, loser, c.score, BETTING_URL, key
+    ]);
     CACHE.seen[key] = true; saveJSON('./cache.json', CACHE);
     appended++;
 
-    // alertas
+    // actualiza rachas + alerta
+    const st = updateStreak(STATE.streaks[id], winner, now);
+    STATE.streaks[id] = st; saveJSON('./state.json', STATE);
+
     const rules = RULES.filter(r => r.matchup === id);
     for (const r of rules) {
       const ok  = (r.player === 'ANY') || (norm(r.player) === st.owner);
       const thr = Number(r.min_streak || 0);
       if (ok && st.len >= thr && !throttle()) {
-        await alert({ mid: id, owner: st.owner, len: st.len, min: thr });
-        await append(s, 'Alerts!A:F', [now, id, st.owner, st.len, thr, 'streak reached']);
+        const msgNote = `score=${c.score}`;
+        const txt=`🎾 Racha alcanzada\n• Enfrentamiento: ${id}\n• Ganador actual: ${st.owner}\n• Racha: ${st.len}\n• Umbral: ${thr}\n• Marcador: ${c.score}\n• ${now}`;
+        if(!ALERT_WEBHOOK_URL){ console.log('[ALERTA]',txt); }
+        else{
+          const headers={'Content-Type':'application/json'};
+          if(ALERT_WEBHOOK_BEARER) headers.Authorization=`Bearer ${ALERT_WEBHOOK_BEARER}`;
+          await fetch(ALERT_WEBHOOK_URL,{method:'POST',headers,body:JSON.stringify({text:txt})});
+          STATE.lastAlertAt=new Date().toISOString(); saveJSON('./state.json',STATE);
+        }
+        await append(s, 'Alerts!A:F', [now, id, st.owner, st.len, thr, msgNote]);
       }
     }
   }
 
-  log(`VISTAS: cards=${cards.length}, matched=${matched}, finalLike=${finalLike}, appended=${appended}`);
+  log(`CICLO: tarjetas=${cards.length}, nuevos=${appended}`);
 
-  // refresco de tablas
+  // refresca tablas H2H/Streaks
   const all  = await read(s, 'Results!A:I');
   const rows = all.slice(1);
   const { H2H, ST } = computeTables(rows);
