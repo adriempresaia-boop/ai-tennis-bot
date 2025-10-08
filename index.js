@@ -3,7 +3,11 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { google } = require('@googleapis/sheets');
+
+// ✅ Importes correctos para Google Sheets
+const { GoogleAuth } = require('google-auth-library');
+const { sheets_v4 } = require('@googleapis/sheets');
+
 const fetch = (...a) => import('node-fetch').then(({ default: f }) => f(...a));
 
 const {
@@ -31,6 +35,7 @@ const ALIASES = {
   "Bautista Agut, Roberto": "Roberto Bautista Agut",
   "Carreno": "Pablo Carreno Busta",
   "Carreño": "Pablo Carreno Busta",
+  "Carreño Busta, Pablo": "Pablo Carreno Busta",
   "Carreno Busta, Pablo": "Pablo Carreno Busta",
   "Karatsev, Aslan": "Aslan Karatsev",
   "Brooksby, Jenson": "Jenson Brooksby",
@@ -56,7 +61,9 @@ const ALIASES = {
   "Lopez, Feliciano": "Feliciano Lopez",
   "Kokkinakis, Thanasi": "Thanasi Kokkinakis",
   "Auger-Aliassime, Felix": "Felix Auger-Aliassime",
-  "Félix Auger Aliassime": "Felix Auger-Aliassime"
+  "Félix Auger Aliassime": "Felix Auger-Aliassime",
+  "Fognini, Fabio": "Fabio Fognini",
+  "Korda, Sebastian": "Sebastian Korda"
 };
 
 function norm(s) {
@@ -70,13 +77,14 @@ function mid(a, b) {
   return `${x} vs ${y}`;
 }
 
-// ---------- Google Sheets ----------
-async function sheets() {
-  const auth = new google.auth.GoogleAuth({
+// ---------- Google Sheets (con GoogleAuth correcto) ----------
+async function getSheets() {
+  const auth = new GoogleAuth({
     credentials: { client_email: GS_CLIENT_EMAIL, private_key: GS_PRIVATE_KEY.replace(/\\n/g, '\n') },
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
   });
-  return google.sheets({ version: 'v4', auth });
+  // Cliente v4
+  return new sheets_v4.Sheets({ auth });
 }
 async function read(s, range) {
   const r = await s.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range });
@@ -250,7 +258,8 @@ async function main() {
     userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Mobile Safari/537.36'
   });
   const page = await context.newPage();
-  const s = await sheets();
+
+  const s = await getSheets();
   await ensureHeaders(s);
 
   while (true) {
