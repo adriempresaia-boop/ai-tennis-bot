@@ -1,5 +1,5 @@
 [
-  { "a": "Roberto Bautista Agut", "b": "Pablo Carreno Busta" },
+  { "a": "Roberto Bautista Agut", "b": "Pablo Carreño Busta" },
   { "a": "Aslan Karatsev", "b": "Jenson Brooksby" },
   { "a": "Kei Nishikori", "b": "Gilles Simon" },
   { "a": "Jack Sock", "b": "Richard Gasquet" },
@@ -7,7 +7,8 @@
   { "a": "Hubert Hurkacz", "b": "Stan Wawrinka" },
   { "a": "Nick Kyrgios", "b": "Diego Schwartzman" },
   { "a": "Frances Tiafoe", "b": "Lorenzo Musetti" },
-  { "a": "Marin Cilic", "b": "Alex de Minaur" },
+  { "a": "Marin Cilic", "b": "Alex De Minaur" },
   { "a": "Milos Raonic", "b": "Feliciano Lopez" },
-  { "a": "Thanasi Kokkinakis", "b": "Felix Auger-Aliassime" }
+  { "a": "Thanasi Kokkinakis", "b": "Felix Auger-Aliassime" },
+  { "a": "Fabio Fognini", "b": "Sebastian Korda" }
 ]
