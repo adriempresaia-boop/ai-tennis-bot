@@ -1,0 +1,5 @@
+.env
+state.json
+cache.json
+diagnostics/
+node_modules/
