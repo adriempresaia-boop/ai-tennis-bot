@@ -1,17 +1,17 @@
 {
-  "name": "ai-tennis-bot",
+  "name": "tennis-bot",
   "version": "1.0.0",
-  "type": "commonjs",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node index.js",
-    "postinstall": "npx playwright install --with-deps chromium"
+    "start": "node index.js"
   },
   "dependencies": {
-    "@googleapis/sheets": "^7.0.0",
-    "google-auth-library": "^9.14.0",
     "dotenv": "^16.4.5",
-    "node-fetch": "^3.3.2",
-    "playwright": "^1.46.0"
+    "express": "^4.19.2",
+    "playwright": "^1.48.2",
+    "google-auth-library": "^9.14.0",
+    "@googleapis/sheets": "^8.1.0",
+    "node-fetch": "^3.3.2"
   }
 }
