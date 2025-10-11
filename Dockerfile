@@ -1,17 +1,17 @@
-# Imagen base con Node y Playwright preinstalado
-FROM mcr.microsoft.com/playwright:v1.48.2-jammy
+# Usa la imagen oficial de Playwright con todo lo necesario (Chromium, Node, etc.)
+FROM mcr.microsoft.com/playwright:v1.47.2-jammy
 
-# Crea carpeta de trabajo
+# Crea el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Copia todo el código
+# Copia todos los archivos de tu repositorio al contenedor
 COPY . .
 
-# Instala dependencias
-RUN npm install
+# Instala dependencias de Node.js (usa --force para evitar errores ETARGET o peer deps)
+RUN npm install --force
 
-# Expone el puerto 8080 (para Railway)
+# Expone el puerto que Railway necesita
 EXPOSE 8080
 
-# Comando de inicio
+# Comando para iniciar el bot
 CMD ["npm", "start"]
