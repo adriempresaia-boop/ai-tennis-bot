@@ -1,18 +1,17 @@
-# Usa la imagen oficial de Playwright con todas las dependencias de Chromium
-FROM mcr.microsoft.com/playwright:v1.46.0-jammy
+# Imagen base con Node y Playwright preinstalado
+FROM mcr.microsoft.com/playwright:v1.48.2-jammy
 
-# Carpeta de trabajo
+# Crea carpeta de trabajo
 WORKDIR /app
 
-# Instalar dependencias de npm
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev || npm i
-
-# Copiar el código
+# Copia todo el código
 COPY . .
 
-# Variables útiles
-ENV NODE_ENV=production
+# Instala dependencias
+RUN npm install
 
-# Arrancar el bot
-CMD ["node", "index.js"]
+# Expone el puerto 8080 (para Railway)
+EXPOSE 8080
+
+# Comando de inicio
+CMD ["npm", "start"]
