@@ -1,6 +1,7 @@
 {
-  "name": "tennis-bot",
+  "name": "ai-tennis-bot",
   "version": "1.0.0",
+  "description": "Bot que lee resultados de tenis y los escribe en Google Sheets",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -13,5 +14,8 @@
     "google-auth-library": "^9.14.0",
     "@googleapis/sheets": "^8.1.0",
     "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
