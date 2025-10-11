@@ -1,17 +1,17 @@
-# Usa la versión más reciente de Playwright (compatible con 1.56.0)
+# Usa la última imagen oficial de Playwright
 FROM mcr.microsoft.com/playwright:v1.56.0-jammy
 
-# Carpeta de trabajo
+# Establece el directorio de trabajo
 WORKDIR /app
 
 # Copia los archivos del proyecto
-COPY . .
-
-# Instala dependencias sin errores de compatibilidad
+COPY package*.json ./
 RUN npm install --force
 
-# Expone el puerto que Railway necesita
+COPY . .
+
+# Expone el puerto
 EXPOSE 8080
 
-# Inicia el bot
-CMD ["npm", "start"]
+# Comando de inicio
+CMD ["node", "index.js"]
