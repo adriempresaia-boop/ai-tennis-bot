@@ -7,12 +7,12 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "playwright": "^1.47.2",
-    "google-auth-library": "^9.14.1",
-    "@googleapis/sheets": "^8.2.0",
-    "node-fetch": "^3.3.2"
+    "dotenv": "*",
+    "express": "*",
+    "playwright": "*",
+    "google-auth-library": "*",
+    "@googleapis/sheets": "*",
+    "node-fetch": "*"
   },
   "engines": {
     "node": "20.x"
